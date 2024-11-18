@@ -80,6 +80,8 @@ int main(int argc, char *argv[]) {
     else
         opPerThread = n / (numBlocks * threadsPerBlock) + 1;
 
+    start = clock();
+
     cudaMalloc((void **)&ad, n * sizeof(float));
     if (!ad) {
         printf("Error allocating array ad\n");
@@ -100,7 +102,6 @@ int main(int argc, char *argv[]) {
     cudaMemcpy(bd, b, n * sizeof(float), cudaMemcpyHostToDevice);
     cudaMemcpy(cd, c, n * sizeof(float), cudaMemcpyHostToDevice);
 
-    start = clock();
 
     /* TODO:
             3. write the kernel, call it: vecGPU
@@ -108,7 +109,6 @@ int main(int argc, char *argv[]) {
                you need to decide about the number of threads, blocks, etc and their geometry.
             */
     multVector<<<numBlocks, threadsPerBlock>>>(ad, bd, cd, n, opPerThread);
-    end = clock();
     /* TODO:
             5. bring the cd array back from the device and store it in c array (declared earlier in main)
             6. free ad, bd, and cd
@@ -117,6 +117,8 @@ int main(int argc, char *argv[]) {
     cudaFree(ad);
     cudaFree(bd);
     cudaFree(cd);
+    
+    end = clock();
 
     printf("Total time taken by the GPU part = %lf\n", (double)(end - start) / CLOCKS_PER_SEC);
     /******************  The end of the GPU part: Do not modify anything in main() below this line  ************/
