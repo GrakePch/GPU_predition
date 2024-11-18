@@ -16,8 +16,12 @@ kernel.print()
 max_wSM = 64   # Hardare limit for kepler+  it is 64
 
 # Get from Device Query
-S_zw = 32   # Warp size to schedule a set of threads
+Sz_w = 32        # Warp size to schedule a set of threads
+Sz_gl = 3072 / 8 # bytes, Num of bytes in a single global mem transaction.
 
 ILP = 1 # assume or instruction are dependent. If independent, ILP could be higher.
 
 TLP = max_wSM   # For simpler model
+
+BW_g = 585.5 # GB/s, Bandwidth for global load/store transfers. Get from bandwidth_test.cu
+
