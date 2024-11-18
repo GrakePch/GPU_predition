@@ -7,4 +7,6 @@ if len(sys.argv) < 2:
     
 filename = sys.argv[1]
 
-cfg(filename)
+kernel = cfg(filename)
+
+kernel.print()
