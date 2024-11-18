@@ -23,5 +23,5 @@ ILP = 1 # assume or instruction are dependent. If independent, ILP could be high
 
 TLP = max_wSM   # For simpler model
 
-BW_g = 585.5 # GB/s, Bandwidth for global load/store transfers. Get from bandwidth_test.cu
+BW_g = 585.5 * 10e9 # Byte/s, Bandwidth for global load/store transfers. Get from bandwidth_test.cu
 
