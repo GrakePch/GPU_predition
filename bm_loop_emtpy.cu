@@ -5,9 +5,9 @@
 
 __global__ void microbenchmark(float *input, float *output) {
     float temp = *input;
-
+    
+    #pragma unroll 1
     for (int i = 0; i < N; i++) {
-        temp += 1.0f; // Example computation
     }
     *output = temp;
 }

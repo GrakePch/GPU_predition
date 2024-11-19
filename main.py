@@ -36,6 +36,13 @@ TLP = max_wSM   # For simpler model
 
 BW_g = 585.5 * 1e9 # Byte/s, Bandwidth for global load/store transfers. Get from bandwidth_test.cu
 
+### Microbenchmark Temp Test Result: [cycles, throughput, peakwarp]
+dictBM = {
+    "add.f32": [6, None, None],
+    "ld.global": [437, None, None],
+    "st.volatile.global": [446, None, None]
+}
+
 
 d_k = f_gpu ##TODO: Total cycle delay for 1 thread
 
