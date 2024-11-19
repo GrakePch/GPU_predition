@@ -16,3 +16,9 @@ To get cuda ptx file.
 ```
     cuda -ptx <cu_file> -o <output>
 ```
+
+---
+To run bm_xxx files, pass an argument as the GPU clock in GHz to calculate number of cycles.
+```
+    <executable> 1.455
+```
