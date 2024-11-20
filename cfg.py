@@ -120,7 +120,8 @@ def cfg(filename):
                     kn.dictReg[ls[1][1:]] = num
                     continue
                 
-            
+                if inst[0] == ".":  # not an instruction
+                    continue
             
                 if inst[0] == "@":  # branch
                     bb.ifJumpToBlock = ls[2][:-1]
@@ -150,5 +151,16 @@ def cfg(filename):
                     bb.dictInstComp[inst] = 0
                 bb.dictInstComp[inst] += 1
             
-    return kn
+    return 
+
+if __name__ == "__main__":
+    
+    demoFilePath = "./ptx/vecmulf.ptx"
+    
+    try:
+        kn = cfg(demoFilePath)
+        
+        kn.print()
+    except:
+        print(demoFilePath, "not found!")
             
