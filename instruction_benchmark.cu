@@ -77,11 +77,6 @@ int main() {
     std::cout << "Instruction delay (dci): " << dci << " seconds" << std::endl;
     std::cout << "Instruction delay in cycles: " << dci_cycles << " cycles" << std::endl;
 
-    // Verify output data
-    for (int i = 0; i < 10; i++) {
-        std::cout << "c[" << i << "] = " << c[i] << std::endl;
-    }
-
     // Free memory
     cudaFree(a);
     cudaFree(b);
