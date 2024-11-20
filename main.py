@@ -1,14 +1,15 @@
 import sys
+import math
 from cfg import cfg
 
-# if len(sys.argv) < 2:
-#     print ("Usage: need arguments <filename>")
-#     sys.exit(1)
+if len(sys.argv) < 2:
+    print ("Usage: need arguments <filename>")
+    sys.exit(1)
     
-# filename = sys.argv[1]
+filename = sys.argv[1]
 
 
-# kernel = cfg(filename)  # get the code block flow from PTX
+kernel = cfg(filename)  # get the code block flow from PTX
 
 # kernel.print()
 
@@ -26,8 +27,8 @@ f_gpu = 1.455 * 1e9   # Hz, GPU Max Clock rate
 
 ### TODO: Get from user input
 # Kernel config
-n_b = 1  # number of blocks
-n_tb = 2047  # number of threads per block
+n_b = 100  # number of blocks
+n_tb = 256  # number of threads per block
 n_t = n_b * n_tb  # number of threads total
 
 ILP = 1 # assume or instruction are dependent. If independent, ILP could be higher.
@@ -79,4 +80,57 @@ while remain_blocks > 0:
 t_kernel = ts_kernel + l_overhead + b_penalty
 
 print(ts_kernel)
+
+
+
+### Below are another implementation of Algorithm 2. 根据我自己的理解来写
+
+max_reg_per_SM = 65536   # Hardware limit
+
+def registers_used_per_thread(kernelPTX):
+    reg_usage = kernelPTX.dictReg
+    num_reg = 0
+    for k in reg_usage:
+        if k == "pred": continue
+        bit_size_str = k[1:]
+        bit_size = 0
+        try:
+            bit_size = int(bit_size_str)
+        except ValueError:
+            print("Unknown size reg:", k)
+            bit_size = 0
+        num_reg_this_type = reg_usage[k]
+        num_reg += math.ceil(bit_size * num_reg_this_type / 32)
+    return num_reg
+            
+    
+    
+def Custom_Sim_Algo():
+    time_thread = d_k / f_gpu                     # Time to run one thread
+    num_ic = math.ceil(n_tb / n_cSM)              # Num of "small wave" of parallel threads in one block
+    time_block = time_thread * num_ic             # Time to run one block
+    blocks_to_exe = n_b                           # Time to run one block
+    num_block_limit_by_thread = max_tSM // n_tb   # block num limited by max thread in one SM
+    
+    ### 待删除评论：每个SM能分配多少Block也受到register总数的限制，paper里似乎没有详细处理
+    num_reg_per_thread = registers_used_per_thread(kernel)        # registers used per thread
+    num_reg_per_block = num_reg_per_thread * n_tb                 # registers used per block
+    num_block_limit_by_reg = max_reg_per_SM // num_reg_per_block  # block num limited by registers in one SM
+    
+    max_block_per_sm = min(
+        num_block_limit_by_thread, 
+        max_bSM, 
+        num_block_limit_by_reg)    # max blocks per SM in ONE WAVE.
+    
+    # Assume RoundRobin scheduling
+    max_block_per_wave = max_block_per_sm * n_SM                  # max blocks total in ONE WAVE. 
+    num_waves = math.ceil(blocks_to_exe / max_block_per_wave)     # Num of WAVE to run all blocks
+    ### TODO: 待删除评论：如果round robin的话根本没必要用SMcounter[currentSM]一个一个模拟过去吧。
+    
+    totalTime = num_waves * time_block
+    return totalTime + l_overhead + b_penalty
+
+print(Custom_Sim_Algo())
+    
+    
     
