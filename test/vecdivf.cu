@@ -6,8 +6,8 @@ __global__ void kernel(float *, float *, float, int);
 
 int main(int argc, char *argv[]) {
     int i;
-    int num = 0;        // number of elements in the arrays
-    float *a, *c;     // arrays at host
+    int num = 0;     // number of elements in the arrays
+    float *a, *c;    // arrays at host
     float *ad, *cd;  // arrays at device
 
     if (argc != 3) {
@@ -73,15 +73,24 @@ int main(int argc, char *argv[]) {
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
 
-    // Launch the kernel
-    cudaEventRecord(start);
-    kernel<<<numblocks, threadsperblock>>>(ad, cd, 1.234, num);
-    cudaEventRecord(stop);
-
-    cudaEventSynchronize(stop);
-
+    int n = 20;
     float milliseconds = 0;
-    cudaEventElapsedTime(&milliseconds, start, stop);
+
+    for (int i = 0; i < n; ++i) {
+        // Launch the kernel
+        cudaEventRecord(start);
+        kernel<<<numblocks, threadsperblock>>>(ad, cd, 1.234, num);
+        cudaEventRecord(stop);
+
+        cudaEventSynchronize(stop);
+
+        float ms = 0;
+        cudaEventElapsedTime(&ms, start, stop);
+        if (i > 0)  // use first run as warm-up to increase accuracy
+            milliseconds += ms;
+    }
+
+    milliseconds /= n - 1;
 
     // bring data back
     cudaMemcpy(c, cd, num * sizeof(float), cudaMemcpyDeviceToHost);

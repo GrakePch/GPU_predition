@@ -7,7 +7,7 @@ __global__ void microbenchmark(float *input, float *output) {
     float temp = *input;
 
     for (int i = 0; i < N; i++) {
-        temp += 1.0f; // Example computation
+        temp /= 1.234f; // Example computation
     }
     *output = temp;
 }

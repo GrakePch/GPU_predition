@@ -2,8 +2,8 @@ import sys
 import math
 from cfg import cfg
 
-if len(sys.argv) < 2:
-    print ("Usage: need arguments <filename>")
+if len(sys.argv) < 4:
+    print ("Usage: python main.py <ptx_file_path> <total_threads> <loop_iter>")
     sys.exit(1)
     
 filename = sys.argv[1]
@@ -13,73 +13,145 @@ kernel = cfg(filename)  # get the code block flow from PTX
 
 # kernel.print()
 
-# TODO: Get from Hardware Manual
+# Get from Hardware Manual
 max_wSM = 64   # Max number of active warps per SM. Hardare limit for kepler+  it is 64
 max_tSM = 2048   # max number of threads per SM
 max_bSM = 32        # Max number of block per SM
 
-# TODO: Get from Device Query
+# Get from Device Query
 n_SM =  80     # num of SMs
 n_cSM = 64     # num of SPs per SM
 Sz_w = 32        # Warp size to schedule a set of threads
 Sz_gl = 3072 / 8 # bytes, Num of bytes in a single global mem transaction.
 f_gpu = 1.455 * 1e9   # Hz, GPU Max Clock rate
 
-### TODO: Get from user input
-# Kernel config
-n_b = 100  # number of blocks
-n_tb = 256  # number of threads per block
-n_t = n_b * n_tb  # number of threads total
+# Kernel config, Get from user input
+n_t = int(sys.argv[2])  # number of threads total
+custom_loop_iterations = int(sys.argv[3])  # number of loops' iteration, cannot be known from ptx
+c_coalescing_factor = 1     # coalescing factor =1 means fully coalescing. >1 means less coalescing.
+
+n_tb = 256    # number of threads per block
+n_b = n_t / n_tb  # number of blocks
 
 ILP = 1 # assume or instruction are dependent. If independent, ILP could be higher.
 
 TLP = max_wSM   # For simpler model
+# TLP = 1   # For simpler model
 
 BW_g = 585.5 * 1e9 # Byte/s, Bandwidth for global load/store transfers. Get from bandwidth_test.cu
 
 ### Microbenchmark Temp Test Result: [cycles, throughput, peakwarp]
 dictBM = {
-    "add.f32": [6, None, None],
-    "ld.global": [437, None, None],
-    "st.volatile.global": [446, None, None]
+    "add": [4, None, 64],
+    "sub": [4, None, 64],
+    "mul": [4, None, 64],
+    "mad": [5, None, 64],
+    "fma": [4, None, 64],
+    "div": [481, None, 64],
+    "mov": [4, None, 64],
+    "and": [2, None, 64],
+    "or": [2, None, 64],
+    "setp": [4, None, 64],
+    "cvta": [10, None, 64],
+}
+
+# [cycles, peakwarp]
+dictBM_mem = {
+    "ld.global": [437, 64],
+    "st.global": [446, 64],
+    "st.volatile.global": [446, 64]
 }
 
 
-d_k = f_gpu ##TODO: Total cycle delay for 1 thread
+### Delay calculation for 1 thread
+def instructionCompDelay(l, t, m):
+    d = l / TLP
+    if (TLP > m):
+        penalty = Sz_w / t
+        d = d / m + penalty
+    return d
+
+def instructionMemDelay(l, m):
+    d = l / TLP
+    if (TLP > m):
+        penalty = Sz_gl * c_coalescing_factor / BW_g * f_gpu
+        d += penalty
+    return d
+
+
+def instructionD(inst):
+    if inst.startswith("ld") or inst.startswith("st"):
+        try:
+            l, m = dictBM_mem[inst[:-4]]
+            return instructionMemDelay(l, m)
+        except:
+            return 0
+    else:
+        try:
+            l, t, m = dictBM[inst.split(".")[0]]
+            return instructionCompDelay(l, t, m)
+        except:
+            print(inst, "not found!")
+            return 0
+        
+
+def delayCalculation(kernel):
+    isFirstLoop = True
+    d_kernal = 0
+    for basicBlock in kernel.listBasicBlock:
+        d_b = 0
+        for i in basicBlock.dictInstMem:
+            num_i = basicBlock.dictInstMem[i]
+            d_b += instructionD(i) * num_i
+        for i in basicBlock.dictInstComp:
+            num_i = basicBlock.dictInstComp[i]
+            d_b += instructionD(i) * num_i
+        
+        if basicBlock.isLoop and isFirstLoop:
+            d_b *= custom_loop_iterations
+            isFirstLoop = False
+            
+        d_kernal += d_b
+    return d_kernal
+            
+        
+# Total cycle delay for 1 thread
+d_k = delayCalculation(kernel)
+
+print("1 Thread delay:", d_k, "cycles")
 
 ### Kernel launch overhead
 l_overhead = 6.3331e-12 * n_t + 3.7808e-06
 
 ### Memory Bottlenecks penalty
-b_penalty = 0 ## TODO:
+b_penalty = 0 
 
 ### Simulation algorithm
-t_thread = d_k / f_gpu  # delay in seconds for 1 thread
-n_ic = n_tb / n_cSM     # number of issue cycles per thread: 
-                        # quantifies the extra cycles needed to issue all instructions for all warps in a thread block
+# t_thread = d_k / f_gpu  # delay in seconds for 1 thread
+# n_ic = n_tb / n_cSM     # number of issue cycles per thread: 
+#                         # quantifies the extra cycles needed to issue all instructions for all warps in a thread block
 
-t_thread = t_thread * n_ic  
+# t_thread = t_thread * n_ic  
 
-ts_kernel = 0   # Accumulated delay for all blocks
+# ts_kernel = 0   # Accumulated delay for all blocks
 
-remain_blocks = n_b
-while remain_blocks > 0:
-    num_blocksRound = 0
-    currentSM = 0
-    SM_counters = [0] * n_SM
+# remain_blocks = n_b
+# while remain_blocks > 0:
+#     num_blocksRound = 0
+#     currentSM = 0
+#     SM_counters = [0] * n_SM
     
-    while num_blocksRound < max_bSM * n_SM and remain_blocks > 0:
-        SM_counters[currentSM] += 1
-        print(SM_counters)
-        num_blocksRound += 1
-        currentSM = (currentSM + 1) % n_SM  # Round-robin assignment
-        remain_blocks -= 1
+#     while num_blocksRound < max_bSM * n_SM and remain_blocks > 0:
+#         SM_counters[currentSM] += 1
+#         num_blocksRound += 1
+#         currentSM = (currentSM + 1) % n_SM  # Round-robin assignment
+#         remain_blocks -= 1
             
-    ts_kernel += max(SM_counters) * t_thread
+#     ts_kernel += max(SM_counters) * t_thread
     
-t_kernel = ts_kernel + l_overhead + b_penalty
+# t_kernel = ts_kernel + l_overhead + b_penalty
 
-print(ts_kernel)
+# print(ts_kernel)
 
 
 
@@ -130,7 +202,8 @@ def Custom_Sim_Algo():
     totalTime = num_waves * time_block
     return totalTime + l_overhead + b_penalty
 
-print(Custom_Sim_Algo())
+finalT = Custom_Sim_Algo()
+print("Predicted: {:.6f} s".format(finalT))
     
     
     

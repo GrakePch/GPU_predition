@@ -14,8 +14,8 @@ __global__ void microbenchmark(float *input, float *output) {
 
 int main(int argc, char *argv[]) {
     
-    if (argc != 3) {
-        printf("usage: <freq in GHz> <GPU id>\n");
+    if (argc != 2) {
+        printf("usage:  gpu_frequency in Ghz\n");
         exit(1);
     }
 
@@ -25,8 +25,11 @@ int main(int argc, char *argv[]) {
 
     float *d_input, *d_output;
     float h_input = 1.0f, h_output;
+    int max_warp = 64;
 
-    cudaSetDevice(atoi(argv[2]));
+    int deviceCount = 0;
+    cudaGetDeviceCount(&deviceCount);
+    cudaSetDevice(deviceCount-1);
 
     cudaMalloc(&d_input, sizeof(float));
     cudaMalloc(&d_output, sizeof(float));
@@ -38,7 +41,7 @@ int main(int argc, char *argv[]) {
     cudaEventCreate(&stop);
 
     cudaEventRecord(start);
-    microbenchmark<<<1, 1>>>(d_input, d_output);
+    microbenchmark<<<1, max_warp>>>(d_input, d_output);
     cudaEventRecord(stop);
 
     cudaEventSynchronize(stop);

@@ -129,5 +129,5 @@ __global__ void kernel(float *a, float *b, float *c, int n) {
     index = (blockIdx.x * blockDim.x) + threadIdx.x;
 
     if (index < n)
-        c[index] = a[index] + b[index];
+        c[index] = a[index] * b[index];
 }
